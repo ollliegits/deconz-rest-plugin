@@ -1,5 +1,7 @@
 #!/bin/bash
 
+NODE_MODULES_DIR=/usr/local/lib/node_modules
+
 UPDATE_VERSION_HB="1.3.4"
 UPDATE_VERSION_HB_HUE="0.13.5"
 UPDATE_VERSION_HB_LIB="5.1.1"
@@ -189,8 +191,14 @@ function installHomebridge {
 	if [ $? -eq 0 ]; then
 		hb_installed=true
 		logInstallVersion "homebridge" "$(homebridge --version)"
+
 		# look for homebridge-hue installation
-		hb_hue_version=$(npm list -g homebridge-hue | grep homebridge-hue | cut -d@ -f2 | xargs)
+
+		# npm list -g is very expensive on RPi0. Replacing with alternative.
+		# hb_hue_version=$(npm list -g homebridge-hue | grep homebridge-hue | cut -d@ -f2 | xargs)
+		# hb_hue_version=$(ph --version)
+		hb_hue_version=$(jq -r '.version' ${NODE_MODULES_DIR}/homebridge-hue/package.json)
+
 		if [ -n "$hb_hue_version" ]; then
 			# homebridge-hue installation found
 			hb_hue_installed=true
@@ -393,8 +401,13 @@ function checkUpdate {
 		timedatectl set-timezone "$dbTimezone"
 	fi
 
-	hb_version=$(npm list -g homebridge | grep homebridge | cut -d@ -f2 | xargs)
-	hb_hue_version=$(npm list -g homebridge-hue | grep homebridge-hue | cut -d@ -f2 | xargs)
+	# hb_version=$(npm list -g homebridge | grep homebridge | cut -d@ -f2 | xargs)
+	hb_version=$(jq -r '.version' ${NODE_MODULES_DIR}/homebridge/package.json)
+
+	# hb_hue_version=$(npm list -g homebridge-hue | grep homebridge-hue | cut -d@ -f2 | xargs)
+	# hb_hue_version=$(ph --version)
+	hb_hue_version=$(jq -r '.version' ${NODE_MODULES_DIR}/homebridge-hue/package.json)
+
 	putHomebridgeUpdated "homebridgeversion" "$hb_hue_version"
 	npm_version=$(npm --version)
 	node_version=$(node --version | cut -dv -f2) # strip the v
@@ -488,13 +501,16 @@ do
 		init
 	fi
 
-	while [[ $TIMEOUT -gt 0 ]]
-	do
-		sleep 1
-		TIMEOUT=$((TIMEOUT - 1))
-	done
+	# RPi0 needs fewer load
+	#while [[ $TIMEOUT -gt 0 ]]
+	#do
+	#	sleep 1
+	#	TIMEOUT=$((TIMEOUT - 1))
+	#done
 
-	TIMEOUT=600 # 10 minutes
+	# TIMEOUT=600 # 10 minutes
+	TIMEOUT=21600 # 6 hours
+	sleep $TIMEOUT
 
 	[[ -z "$ZLLDB" ]] && continue
 	[[ ! -f "$ZLLDB" ]] && continue

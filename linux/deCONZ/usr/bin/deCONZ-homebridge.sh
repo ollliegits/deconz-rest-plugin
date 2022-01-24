@@ -1,5 +1,7 @@
 #!/bin/bash
 
+NODE_MODULES_DIR=/usr/local/lib/node_modules
+
 ZLLDB=""
 SQL_RESULT=
 MAINUSER=$(getent passwd 1000 | cut -d: -f1)
@@ -163,7 +165,11 @@ function checkHomebridge {
 	local HOMEBRIDGE=""
 	local IP_ADDRESS=""
 	local HOMEBRIDGE_PIN=""
-	local hb_hue_version=$(npm list -g homebridge-hue | grep homebridge-hue | cut -d@ -f2 | xargs)
+
+	# npm list -g is extremely expensive on RPi0 ( > 3.5min). Replacing with faster equivalent.
+	# local hb_hue_version=$(npm list -g homebridge-hue | grep homebridge-hue | cut -d@ -f2 | xargs)
+	# local hb_hue_version=$(ph --version)
+	local hb_hue_version=$(jq -r '.version' ${NODE_MODULES_DIR}/homebridge-hue/package.json)
 
 	#hostline used in config
 	local hostline="\"hosts\": [\"127.0.0.1\"],"
@@ -181,7 +187,7 @@ function checkHomebridge {
 		param=${params[$i]}
 
 		sqliteSelect "select value from config2 where key=\"${param}\""
-		value="$SQL_RESULT"			
+		value="$SQL_RESULT"
 
 		# basic check for non empty
 		if [[ ! -z "$value" ]]; then
@@ -242,7 +248,7 @@ function checkHomebridge {
 
 	## check if apikey already exist or create a new apikey for homebridge apps
 	sqliteSelect "select * from auth where devicetype like 'homebridge-hue#%' limit 1"
-	
+
 	if [[ "$SQL_RESULT" == "error" ]]; then
 		TIMEOUT=5
 		return
@@ -411,7 +417,7 @@ function checkHomebridge {
 			TIMEOUT=5
 			return
 		fi
-	
+
 		HOMEBRIDGE_PIN="$SQL_RESULT"
 
 		if [ -z "$HOMEBRIDGE_PIN" ]; then
@@ -509,7 +515,9 @@ do
 		TIMEOUT=$((TIMEOUT - 1))
 	done
 
-	TIMEOUT=30
+	# TIMEOUT=30
+	# To reduce load on RPi0, set timeout to 6h
+	TIMEOUT=21600
 
 	[[ -z "$ZLLDB" ]] && continue
 	[[ ! -f "$ZLLDB" ]] && continue
